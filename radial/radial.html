@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 2rem;
+    background: #fff;
+  }
+
+  .tooltip {
+    position: absolute;
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    background: white;
+    border: 1px solid #ccc;
+    pointer-events: none;
+    border-radius: 4px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+  }
+</style>
+<body>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <div id="chart"></div>
+  <script>
+    const width = 500;
+    const height = 500;
+    const innerRadius = 60;
+    const barHeight = 10;
+
+
+    const margin = 40;
+
+  const svg = d3.select("#chart")
+  .append("svg")
+  .attr("width", width + margin * 2)
+  .attr("height", height + margin * 2)
+  .append("g")
+  .attr("transform", `translate(${(width + margin * 2) / 2}, ${(height + margin * 2) / 2})`);
+
+
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+    d3.json("4room_radial_data.json").then(data => {
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+      const years = [...new Set(data.map(d => d.year))].sort();
+      const maxValue = d3.max(data, d => d.value);
+      const minValue = d3.min(data, d => d.value);
+
+      const angleScale = d3.scaleBand()
+        .domain(months)
+        .range([0, 2 * Math.PI])
+        .align(0);
+
+      const colorScale = d3.scaleSequential(d3.interpolateBlues)
+        .domain([minValue, maxValue]);
+
+      data.forEach(d => {
+        d.theta = angleScale(d.month);
+        d.r = innerRadius + years.indexOf(d.year) * barHeight;
+      });
+
+      svg.append("g")
+        .selectAll("path")
+        .data(data)
+        .join("path")
+        .attr("d", d => {
+          const arc = d3.arc()
+            .innerRadius(d.r)
+            .outerRadius(d.r + barHeight)
+            .startAngle(d.theta)
+            .endAngle(d.theta + angleScale.bandwidth());
+          return arc();
+        })
+        .attr("fill", d => colorScale(d.value))
+        .attr("stroke", "#fff")
+        .on("mouseover", function (event, d) {
+          tooltip.transition().duration(200).style("opacity", 0.9);
+          tooltip.html(`${d.year} / ${d.month}<br>Value: ${d.value}`)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", () => tooltip.transition().duration(500).style("opacity", 0));
+
+      // Month labels
+      svg.append("g")
+        .selectAll("text")
+        .data(months)
+        .join("text")
+        .attr("x", d => {
+          const angle = angleScale(d) + angleScale.bandwidth() / 2 - Math.PI / 2;
+          return (innerRadius + years.length * barHeight + 20) * Math.cos(angle);
+        })
+        .attr("y", d => {
+          const angle = angleScale(d) + angleScale.bandwidth() / 2 - Math.PI / 2;
+          return (innerRadius + years.length * barHeight + 20) * Math.sin(angle);
+        })
+        .attr("text-anchor", "middle")
+        .attr("alignment-baseline", "middle")
+        .text(d => d);
+    });
+  </script>
+</body>
